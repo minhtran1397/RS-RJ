@@ -3,7 +3,7 @@ import numpy as np  # xử lý mảng
 from scipy import sparse  # spare: thưa thớt, chuẩn hóa ma trận
 # thư viện thuật toán (có độ tương đồng với gì nữa á)
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.metrics import jaccard_score
+# from sklearn.metrics import jaccard_score
 '''
 From scikit - learn: [‘cityblock’, ‘cosine’, ‘euclidean’, ‘l1’, ‘l2’, ‘manhattan’].
 These metrics support sparse matrix inputs.
@@ -16,9 +16,50 @@ From scipy.spatial.distance: [‘braycurtis’, ‘canberra’, ‘chebyshev’,
 ‘yule’] See the documentation for scipy.spatial.distance for details on these metrics.
 These metrics do not support sparse matrix inputs.
 '''
-from scipy.spatial.distance import jaccard
+# from scipy.spatial.distance import jaccard
 from scipy.spatial.distance import correlation
 # from scipy.spatial import distance
+
+
+def jaccard_similarity(x, y):
+    """ returns the jaccard similarity between two lists """
+    intersection_cardinality = len(set.intersection(*[set(x), set(y)]))
+    union_cardinality = len(set.union(*[set(x), set(y)]))
+    return intersection_cardinality / float(union_cardinality)
+
+
+def rjaccard_similarity(u, v):
+    intersection_cardinality = len(set.intersection(*[set(u), set(v)]))
+    Iu = len(set(u))
+    Iv = len(set(v))
+    Iu_bar = Iu - intersection_cardinality
+    Iv_bar = Iv - intersection_cardinality
+    if intersection_cardinality == 0:
+        return 0
+    else:
+        return(1/(1+(1/intersection_cardinality)+(Iu_bar/(1+Iu_bar))+(1/(1+Iv_bar))))
+
+
+def common_dimensions(u, v):
+    """ takes in two vectors and returns a tuple of the vectors with both non zero dimensions
+       i.e.
+       v1 : [ 1, 2, 3, 0 ]        -->      return [2, 3]
+       v2 : [ 0, 4, 5, 6 ]        -->      return [4, 5]  """
+    common_u = []
+    common_v = []
+    for i in range(0, len(u)):
+        if u[i] != 0 and v[i] != 0:
+            common_u.append(u[i])
+            common_v.append(v[i])
+            # print 'INDEX SAME:',i
+    return common_u, common_v
+
+
+def msd_similarity(u, v, l):
+    common_arr = common_dimensions(u, v)
+    msd = sum(pow(a - b, 2) for a, b in zip(common_arr[0], common_arr[1]))
+    intersection_cardinality = len(common_arr[0])
+    return (1-((msd/intersection_cardinality)/l))
 
 
 class CF(object):
@@ -36,6 +77,7 @@ class CF(object):
         # number of users and items. Remember to add 1 since id starts from 0
         self.n_users = int(np.max(self.Y_data[:, 0])) + 1
         self.n_items = int(np.max(self.Y_data[:, 1])) + 1
+        self.L = int(max(self.Y_data[:, 2]))
 
     '''
     Khi có dữ liệu mới, cập nhận Utility matrix
@@ -58,39 +100,23 @@ class CF(object):
     def normalize_Y(self):
         users = self.Y_data[:, 0]  # all users - first col of the Y_data
         self.Ybar_data = self.Y_data.copy()  # copy Y_data qua Ybar_data
-        print('Ybar_data nè:')
-        print(self.Ybar_data)
         # tạo mảng 0 với số lương phần tử = n_user (số lượng dòng)
         self.mu = np.zeros((self.n_users,))
-        print('mu nè:')
-        print(self.mu)
         for n in range(self.n_users):
             # mỗi dòng là chỉ số đánh giá của mỗi người dùng
             # chỉ số đánh giá phải là int nên cần convert
-            print('n nè:')
-            print(n)
             ids = np.where(users == n)[0].astype(np.int32)
-            print('ids nè:')
-            print(ids)
             # chỉ ra các item liên quan đến user ids, dòng thứ ids, cột 1
             item_ids = self.Y_data[ids, 1]
-            print('item_ids nè:')
-            print(item_ids)
             # chỉ ra các rating liên quan đến user ids, dòng thứ ids, cột 2
             ratings = self.Y_data[ids, 2]
-            print('ratings nè:')
-            print(ratings)
             # tính trung bình đánh giá matrix
             m = np.mean(ratings)
-            print('trung bình đánh giá m nè:')
-            print(m)
             if np.isnan(m):  # Nếu giá trị m rỗng hoặc không phải số thì m=0
                 m = 0  # to avoid empty array and nan value
             # normalize: FIXME: chuẩn hóa rating sang rating trừ trung bình ?!!!
             self.Ybar_data[ids, 2] = ratings - \
                 self.mu[n]  # FIXME: Không chạy ?
-            print('Ybar_data chuẩn hóa nè:')
-            print(self.Ybar_data)
 
         ################################################
         # sparse matrix là ma trận hiểu số 0 là rỗng, chỉ lưu trữ vị trí của nó
@@ -102,13 +128,9 @@ class CF(object):
         # Tạo mảng ((item, user) rating)
         self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
                                        (self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))
-        print('Ybar1 - mảng i-u-r chưa sắp xếp:')
-        print(self.Ybar)
         self.Ybar = self.Ybar.tocsr()  # sắp xếp lại theo thứ tự tăng dần id item
-        print('Ybar1 - mảng i-u-r đã sắp xếp id item tăng dần:')
+        print('Ybar')
         print(self.Ybar)
-        print('Ybar2.T - mảng i-u-r chuyển vị thành mảng u-i-r:')
-        print(self.Ybar.T)
         # TODO: Tìm
     # Chuyển ma trận thành 0 1 (binary) để tính Jaccard
 
@@ -120,12 +142,28 @@ class CF(object):
     def similarity(self, method=1):
         if method == 1:  # cosine
             # TODO: tìm .T là gì: .T là ma trận nghịch đảo, ở đây nghịch đảo vị trí user-item thành vị trí item-user
-            self.S = self.dist_func(self.Ybar.T)
+            self.S = self.dist_func(self.Ybar.T, self.Ybar.T)
         # jaccard np.where(a > 0.5, 1, 0) ý tưởng là dùng hàm trên id của item non zero
         if method == 2:
-            y_true = np.array([[0, 1, 1], [0, 1, 0]])
-            y_pred = np.array([[1, 1, 1], [1, 0, 0]])
-            self.S = self.dist_func(y_true[0], y_pred[0])
+            self.sim_jaccard = np.zeros((self.n_users, self.n_users))
+            users = self.Y_data[:, 0]
+            print(self.sim_jaccard[0, 1])
+            for i in range(self.n_users):
+                ids = np.where(users == i)[0].astype(np.int32)
+                item_ids = self.Y_data[ids, 1]
+                print('u{}={}'.format(i, item_ids))
+                # self.sim_jaccard[ids, ids] = 1
+                for j in range(self.n_users):
+                    jds = np.where(users == j)[0].astype(np.int32)
+                    item_jds = self.Y_data[jds, 1]
+                    print('v{}={}'.format(j, item_jds))
+                    print("-----")
+                    self.sim_jaccard[i, j] = self.dist_func(
+                        item_ids, item_jds)
+                self.sim_jaccard[i]
+            self.S = self.sim_jaccard
+        if method = 3:  # msd_similarity
+            # TODO:
         print('S nè :')
         print(self.S)
     # Thực hiện lại 2 hàm phía trên khi có thêm dữ liệu.
