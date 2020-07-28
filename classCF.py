@@ -4,7 +4,7 @@ from scipy import sparse  # spare: thưa thớt, chuẩn hóa ma trận
 import math
 from math import *
 # thư viện thuật toán (có độ tương đồng với gì nữa á)
-# from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics.pairwise import cosine_similarity
 # from sklearn.metrics import jaccard_score
 '''
 From scikit - learn: [‘cityblock’, ‘cosine’, ‘euclidean’, ‘l1’, ‘l2’, ‘manhattan’].
@@ -57,7 +57,8 @@ def common_dimensions(u, v):
     return common_u, common_v
 
 
-def msd_similarity(u, v, l):
+def msd_similarity(u, v):
+    l = 25
     common_arr = common_dimensions(u, v)
     msd = sum(pow(a - b, 2) for a, b in zip(common_arr[0], common_arr[1]))
     intersection_cardinality = len(common_arr[0])
@@ -201,33 +202,34 @@ class CF(object):
     """def intArrToBinary(self):
         self.BinArr = np.where(self.Ybar.T > 0, 1, 0)"""
 
+    # Lặp qua mỗi cặp user để tính độ tương đồng (dựa trên mảng coo_matrix Ybar)
+    def loop_user(self):
+        self.sim_arr = np.zeros((self.n_users, self.n_users))
+        print(self.n_users)
+        for i in range(self.n_users):
+            # ids = np.where(users == i)[0].astype(np.int32)
+            ratings_i_nD = self.Ybar.T[i, :].toarray()
+            # Xuất ra mảng nhiều chiều [[value]], cần truyền mảng 1 chiều [value] => :
+            ratings_i = ratings_i_nD[0]
+            print('u{}={}'.format(i, ratings_i))
+            for j in range(self.n_users):
+                # jds = np.where(users == j)[0].astype(np.int32)
+                ratings_j_nD = self.Ybar.T[j, :].toarray()
+                # Xuất ra mảng nhiều chiều [[value]], cần truyền mảng 1 chiều [value] => :
+                ratings_j = ratings_j_nD[0]
+                print('v{}={}'.format(j, ratings_j))
+                print("-----")
+                self.sim_arr[i, j] = round(self.dist_func(
+                    ratings_i, ratings_j), 3)
+            self.sim_arr[i]
+        self.S = self.sim_arr
     # tính độ tương đồng
 
     def similarity(self, method=1):
         if method == 1:  # cosine
             # T là ma trận nghịch đảo, ở đây nghịch đảo vị trí user-item thành vị trí item-user
-            # self.S = self.dist_func(self.Ybar.T, self.Ybar.T) #dùng thư viện
-            self.sim_cos = np.zeros((self.n_users, self.n_users))
-            # users = self.Y_data[:, 0]
-            # print(self.sim_cos)
-            print(self.n_users)
-            for i in range(self.n_users):
-                # ids = np.where(users == i)[0].astype(np.int32)
-                ratings_i_nD = self.Ybar.T[i, :].toarray()
-                # Xuất ra mảng nhiều chiều [[value]], cần truyền mảng 1 chiều [value] => :
-                ratings_i = ratings_i_nD[0]
-                print('u{}={}'.format(i, ratings_i))
-                for j in range(self.n_users):
-                    # jds = np.where(users == j)[0].astype(np.int32)
-                    ratings_j_nD = self.Ybar.T[j, :].toarray()
-                    # Xuất ra mảng nhiều chiều [[value]], cần truyền mảng 1 chiều [value] => :
-                    ratings_j = ratings_j_nD[0]
-                    print('v{}={}'.format(j, ratings_j))
-                    print("-----")
-                    self.sim_cos[i, j] = self.dist_func(
-                        ratings_i, ratings_j)
-                self.sim_cos[i]
-            self.S = self.sim_cos
+            self.S = self.dist_func(self.Ybar.T, self.Ybar.T)  # dùng thư viện
+            # self.loop_user()
         # jaccard np.where(a > 0.5, 1, 0) ý tưởng là dùng hàm trên id của item non zero
         if method == 2:
             self.sim_jaccard = np.zeros((self.n_users, self.n_users))
@@ -248,64 +250,15 @@ class CF(object):
                 self.sim_jaccard[i]
             self.S = self.sim_jaccard
         if method == 3:  # msd_similarity
-            self.sim_msd = np.zeros((self.n_users, self.n_users))
-            # users = self.Y_data[:, 0]
-            print(self.sim_msd)
-            print(self.n_users)
-            for i in range(self.n_users):
-                # ids = np.where(users == i)[0].astype(np.int32)
-                ratings_i_nD = self.Ybar.T[i, :].toarray()
-                # Xuất ra mảng nhiều chiều [[value]], cần truyền mảng 1 chiều [value] => :
-                ratings_i = ratings_i_nD[0]
-                print('u{}={}'.format(i, ratings_i))
-                for j in range(self.n_users):
-                    # jds = np.where(users == j)[0].astype(np.int32)
-                    ratings_j_nD = self.Ybar.T[j, :].toarray()
-                    # Xuất ra mảng nhiều chiều [[value]], cần truyền mảng 1 chiều [value] => :
-                    ratings_j = ratings_j_nD[0]
-                    print('v{}={}'.format(j, ratings_j))
-                    print("-----")
-                    self.sim_msd[i, j] = self.dist_func(
-                        ratings_i, ratings_j, 25)
-                self.sim_msd[i]
-            self.S = self.sim_msd
+            self.loop_user()
         if method == 4:  # COR
-            self.sim_cor = np.zeros((self.n_users, self.n_users))
-            print(self.n_users)
-            for i in range(self.n_users):
-                ratings_i_nD = self.Ybar.T[i, :].toarray()
-                ratings_i = ratings_i_nD[0]
-                print('u{}={}'.format(i, ratings_i))
-                for j in range(self.n_users):
-                    ratings_j_nD = self.Ybar.T[j, :].toarray()
-                    ratings_j = ratings_j_nD[0]
-                    print('v{}={}'.format(j, ratings_j))
-                    print("-----")
-                    self.sim_cor[i, j] = self.dist_func(
-                        ratings_i, ratings_j)
-                self.sim_cor[i]
-            self.S = self.sim_cor
+            self.loop_user()
         if method == 5:  # CPC
-            self.sim_cpc = np.zeros((self.n_users, self.n_users))
-            print(self.n_users)
-            for i in range(self.n_users):
-                ratings_i_nD = self.Ybar.T[i, :].toarray()
-                ratings_i = ratings_i_nD[0]
-                print('u{}={}'.format(i, ratings_i))
-                for j in range(self.n_users):
-                    ratings_j_nD = self.Ybar.T[j, :].toarray()
-                    ratings_j = ratings_j_nD[0]
-                    print('v{}={}'.format(j, ratings_j))
-                    print("-----")
-                    self.sim_cpc[i, j] = self.dist_func(
-                        ratings_i, ratings_j)
-                self.sim_cpc[i]
-            self.S = self.sim_cpc
+            self.loop_user()
         print('S nè :')
         print(self.S)
 
     # Thực hiện lại 2 hàm phía trên khi có thêm dữ liệu:
-
     def refresh(self, method=1):
         """
         Normalize data and calculate similarity matrix again (after
@@ -316,3 +269,90 @@ class CF(object):
 
     def fit(self, method=1):
         self.refresh(method)
+
+    # Predict và recommend
+
+    def __pred(self, u, i, normalized=1):
+        """ 
+        predict the rating of user u for item i (normalized)
+        if you need the un
+        """
+        # Step 1: find all users who rated i
+        # ids: vị trí của item i trong mảng Y_data
+        ids = np.where(self.Y_data[:, 1] == i)[0].astype(np.int32)
+        # Step 2:
+        users_rated_i = (self.Y_data[ids, 0]).astype(np.int32)
+        # Step 3: find similarity btw the current user and others
+        # who already rated i
+        sim = self.S[u, users_rated_i]
+        # Step 4: find the k most similarity users
+        a = np.argsort(sim)[-self.k:]
+        # and the corresponding similarity levels
+        nearest_s = sim[a]
+        # How did each of 'near' users rated item i
+        r = self.Ybar[i, users_rated_i[a]]
+        if normalized:
+            # add a small number, for instance, 1e-8, to avoid dividing by 0
+            return (r*nearest_s)[0]/(np.abs(nearest_s).sum() + 1e-8)
+
+        return (r*nearest_s)[0]/(np.abs(nearest_s).sum() + 1e-8) + self.mu[u]
+
+    def pred(self, u, i, normalized=1):
+        """ 
+        predict the rating of user u for item i (normalized)
+        if you need the un
+        """
+        if self.uuCF:
+            return self.__pred(u, i, normalized)
+        return self.__pred(i, u, normalized)
+
+    def recommend(self, u):
+        """
+        Determine all items should be recommended for user u.
+        The decision is made based on all i such that:
+        self.pred(u, i) > 0. Suppose we are considering items which 
+        have not been rated by u yet. 
+        """
+        ids = np.where(self.Y_data[:, 0] == u)[0]
+        items_rated_by_u = self.Y_data[ids, 1].tolist()
+        recommended_items = []
+        for i in range(self.n_items):
+            if i not in items_rated_by_u:
+                rating = self.__pred(u, i)
+                if rating > 0:
+                    recommended_items.append(i)
+
+        return recommended_items
+
+    def recommend2(self, u):
+        """
+        Determine all items should be recommended for user u.
+        The decision is made based on all i such that:
+        self.pred(u, i) > 0. Suppose we are considering items which 
+        have not been rated by u yet. 
+        """
+        ids = np.where(self.Y_data[:, 0] == u)[0]
+        items_rated_by_u = self.Y_data[ids, 1].tolist()
+        recommended_items = []
+
+        for i in range(self.n_items):
+            if i not in items_rated_by_u:
+                rating = self.__pred(u, i)
+                if rating > 0:
+                    recommended_items.append(i)
+
+        return recommended_items
+
+    def print_recommendation(self):
+        """
+        print all items which should be recommended for each user 
+        """
+        print('Recommendation: ')
+        for u in range(self.n_users):
+            recommended_items = self.recommend(u)
+            if self.uuCF:
+                print('    Recommend item(s):',
+                      recommended_items, 'for user', u)
+            else:
+                print('    Recommend item', u,
+                      'for user(s) : ', recommended_items)
