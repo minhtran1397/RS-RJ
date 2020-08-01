@@ -21,10 +21,11 @@ JAC = jaccard_similarity  # method = 2
 MSD = msd_similarity  # method = 3
 COR = cor_similarity  # method = 4
 CPC = cpc_similarity  # method = 5
+RJ = rjaccard_similarity
 
-rs = CF(rate_train, k=30, dist_func=COS_lib, uuCF=1)
+rs = CF(rate_train, k=30, dist_func=MSD, uuCF=1)
 # fit(method)
-rs.fit(1)
+rs.fit(3)
 
 n_tests = rate_test.shape[0]
 SE = 0  # squared error
