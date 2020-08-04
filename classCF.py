@@ -43,16 +43,31 @@ def rjaccard_similarity(u, v):
 
 
 def common_dimensions(u, v):
-    """ takes in two vectors and returns a tuple of the vectors with both non zero dimensions
-       i.e.
-       v1 : [ 1, 2, 3, 0 ]        -->      return [2, 3]
-       v2 : [ 0, 4, 5, 6 ]        -->      return [4, 5]  """
+    '''takes in two vectors and returns a tuple of the vectors with both non zero dimensions
+        i.e.
+        v1 : [ 1, 2, 3, 0 ]        -->      return [2, 3]
+        v2 : [ 0, 4, 5, 6 ]        -->      return [4, 5] '''
     common_u = []
     common_v = []
-    for i in range(0, len(u)):
+    for i in range(len(u)):
         if u[i] != 0 and v[i] != 0:
             common_u.append(u[i])
             common_v.append(v[i])
+            # print 'INDEX SAME:',i
+    return common_u, common_v
+
+
+def common_dimensions1(item_ids, u, v):
+    '''takes in two vectors and returns a tuple of the vectors with both non zero dimensions
+        i.e.
+        v1 : [ 1, 2, 3, 0 ]        -->      return [2, 3]
+        v2 : [ 0, 4, 5, 6 ]        -->      return [4, 5] '''
+    common_u = []
+    common_v = []
+    for i in range(len(item_ids)):
+        if v[item_ids[i]] != 0:
+            common_u.append(u[item_ids[i]])
+            common_v.append(v[item_ids[i]])
             # print 'INDEX SAME:',i
     return common_u, common_v
 
@@ -74,8 +89,8 @@ def square_rooted(x, y=0):
     return sqrt(sum([(a - y) * (a - y) for a in x]))
 
 
-def cos_similarity(u, v):
-    common_arr = common_dimensions(u, v)
+def cos_similarity(item_ids, u, v):
+    common_arr = common_dimensions1(item_ids, u, v)
     common_u = common_arr[0]
     common_v = common_arr[1]
     numerator = sum(a * b for a, b in zip(common_u, common_v))
@@ -114,12 +129,12 @@ def cor_similarity(u, v):
     common_u = common_arr[0]
     common_v = common_arr[1]
     avg_u = sum(u) / nonzero_count(u)
-    #print("sum(u): ", sum(u))
-    #print("sum(v): ", sum(v))
+    # print("sum(u): ", sum(u))
+    # print("sum(v): ", sum(v))
 
     avg_v = sum(v) / nonzero_count(v)
-    #print("avg_u: ", avg_u)
-    #print("avg_v: ", avg_v)
+    # print("avg_u: ", avg_u)
+    # print("avg_v: ", avg_v)
     numerator = sum((a - avg_u)*(b - avg_v)
                     for a, b in zip(common_u, common_v))
     denominator = square_rooted(
@@ -186,47 +201,7 @@ class CF(object):
         users = self.Y_data[:, 0]  # all users - first col of the Y_data
         self.Ybar_data = self.Y_data.copy()  # copy Y_data qua Ybar_data
         # tạo mảng 0 với số lương phần tử = n_user (số lượng dòng)
-        #self.mu = np.zeros((self.n_users,))
-        '''for n in range(self.n_users):
-            # mỗi dòng là chỉ số đánh giá của mỗi người dùng
-            # chỉ số đánh giá phải là int nên cần convert
-            ids = np.where(users == n)[0].astype(np.int32)
-            # chỉ ra các item liên quan đến user ids, dòng thứ ids, cột 1
-            item_ids = self.Y_data[ids, 1]
-            # chỉ ra các rating liên quan đến user ids, dòng thứ ids, cột 2
-            ratings = self.Y_data[ids, 2]
-            # tính trung bình đánh giá matrix
-            #m = np.mean(ratings)
-            # print("m nè: ", m)
-            # if np.isnan(m):  # Nếu giá trị m rỗng hoặc không phải số thì m=0
-            #    m = 0  # to avoid empty array and nan value
-            #self.mu[n] = m
-            # normalize: FIXME: chuẩn hóa rating sang rating trừ trung bình ?!!!
-            self.Ybar_data[ids, 2] = ratings  # - self.mu[n]
-            # print("mu nè: ", self.mu[n])'''
-        ################################################
-        # sparse matrix là ma trận hiểu số 0 là rỗng, chỉ lưu trữ vị trí của nó
-        # form the rating matrix as a sparse matrix. Sparsity is important
-        # for both memory and computing efficiency. For example, if #user = 1M,
-        # #item = 100k, then shape of the rating matrix would be (100k, 1M),
-        # you may not have enough memory to store this. Then, instead, we store
-        # nonzeros only, and, of course, their locations.
-        '''# Tạo mảng ((item, user) rating)
-        self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
-                                       (self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))'''
-        # Tạo mảng ((item, user) rating)
-        self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
-                                       (self.Ybar_data[:, 0], self.Ybar_data[:, 1])), (self.n_users, self.n_items))
-        # self.Ybar = self.Ybar.tocsr()  # sắp xếp lại theo thứ tự tăng dần id item
-        self.Ybar = self.Ybar.toarray()
-        print('Ybar.T')
-        print(self.Ybar)
-
-    def normalize_Y(self):
-        users = self.Y_data[:, 0]  # all users - first col of the Y_data
-        self.Ybar_data = self.Y_data.copy()  # copy Y_data qua Ybar_data
-        # tạo mảng 0 với số lương phần tử = n_user (số lượng dòng)
-        #self.mu = np.zeros((self.n_users,))
+        self.mu = np.zeros((self.n_users,))
         for n in range(self.n_users):
             # mỗi dòng là chỉ số đánh giá của mỗi người dùng
             # chỉ số đánh giá phải là int nên cần convert
@@ -236,14 +211,56 @@ class CF(object):
             # chỉ ra các rating liên quan đến user ids, dòng thứ ids, cột 2
             ratings = self.Y_data[ids, 2]
             # tính trung bình đánh giá matrix
-            #m = np.mean(ratings)
+            m = np.mean(ratings)
             # print("m nè: ", m)
-            # if np.isnan(m):  # Nếu giá trị m rỗng hoặc không phải số thì m=0
-            #    m = 0  # to avoid empty array and nan value
-            #self.mu[n] = m
+            if np.isnan(m):  # Nếu giá trị m rỗng hoặc không phải số thì m=0
+                m = 0  # to avoid empty array and nan value
+            self.mu[n] = m
             # normalize: FIXME: chuẩn hóa rating sang rating trừ trung bình ?!!!
             self.Ybar_data[ids, 2] = ratings  # - self.mu[n]
-            # print("mu nè: ", self.mu[n])
+            #print("mu nè: ", self.mu[n])
+        ################################################
+        # sparse matrix là ma trận hiểu số 0 là rỗng, chỉ lưu trữ vị trí của nó
+        # form the rating matrix as a sparse matrix. Sparsity is important
+        # for both memory and computing efficiency. For example, if #user = 1M,
+        # #item = 100k, then shape of the rating matrix would be (100k, 1M),
+        # you may not have enough memory to store this. Then, instead, we store
+        # nonzeros only, and, of course, their locations.
+        # Tạo mảng ((item, user) rating)
+        self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
+                                       (self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))
+        # Tạo mảng ((item, user) rating)
+        '''self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
+                                       (self.Ybar_data[:, 0], self.Ybar_data[:, 1])), (self.n_users, self.n_items))'''
+        self.Ybar = self.Ybar.tocsr()  # sắp xếp lại theo thứ tự tăng dần id item
+        #self.Ybar = self.Ybar.toarray()
+        print('users-items')
+        print(self.Ybar)
+
+    def normalize_Y(self):
+        users = self.Y_data[:, 0]  # all users - first col of the Y_data
+        self.Ybar_data = self.Y_data.copy()  # copy Y_data qua Ybar_data
+        # tạo mảng 0 với số lương phần tử = n_user (số lượng dòng)
+        self.mu = np.zeros((self.n_users,))
+        for n in range(self.n_users):
+            # mỗi dòng là chỉ số đánh giá của mỗi người dùng
+            # chỉ số đánh giá phải là int nên cần convert
+            ids = np.where(users == n)[0]  # .astype(np.int32)
+            # chỉ ra các item liên quan đến user ids, dòng thứ ids, cột 1
+            item_ids = self.Y_data[ids, 1]
+            # chỉ ra các rating liên quan đến user ids, dòng thứ ids, cột 2
+            ratings = self.Y_data[ids, 2]
+            # tính trung bình đánh giá matrix
+            m = np.mean(ratings)
+            #print("m nè: ", m)
+            if np.isnan(m):  # Nếu giá trị m rỗng hoặc không phải số thì m=0
+                m = 0  # to avoid empty array and nan value
+            self.mu[n] = m
+            # normalize: FIXME: chuẩn hóa rating sang rating trừ trung bình ?!!!
+            #print("ratings - self.mu[n]", ratings - self.mu[n])
+            self.Ybar_data[ids, 2] = ratings-self.mu[n]
+            print("Ybar_data[ids, 2] ", self.Ybar_data[ids, 2])
+
         ################################################
         # sparse matrix là ma trận hiểu số 0 là rỗng, chỉ lưu trữ vị trí của nó
         # form the rating matrix as a sparse matrix. Sparsity is important
@@ -255,8 +272,13 @@ class CF(object):
         self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
                                        (self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))'''
         # Tạo mảng ((item, user) rating)
-        self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
-                                       (self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))
+        self.Y = sparse.coo_matrix((self.Ybar_data[:, 2],
+                                    (self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))
+        self.Y = self.Y.tocsr()
+        print('Y.T')
+        print(self.Y.T)
+        self.Ybar = sparse.coo_matrix((self.Y_data[:, 2],
+                                       (self.Y_data[:, 1], self.Y_data[:, 0])), (self.n_items, self.n_users))
         self.Ybar = self.Ybar.tocsr()  # sắp xếp lại theo thứ tự tăng dần id item
         print('Ybar.T')
         print(self.Ybar.T)
@@ -276,11 +298,11 @@ class CF(object):
             ratings_i = ratings_i_nD[0]
             print('u{}={}'.format(i, ratings_i))
             for j in range(self.n_users):
-                #jds = np.where(users == j)[0].astype(np.int32)
+                # jds = np.where(users == j)[0].astype(np.int32)
                 ratings_j_nD = self.Ybar.T[j, :].toarray()
                 # Xuất ra mảng nhiều chiều [[value]], cần truyền mảng 1 chiều [value] => :
                 ratings_j = ratings_j_nD[0]
-                #print('v{}={}'.format(j, ratings_j))
+                # print('v{}={}'.format(j, ratings_j))
                 # print("-----")
                 self.sim_arr[i, j] = self.dist_func(
                     ratings_i, ratings_j)
@@ -288,34 +310,29 @@ class CF(object):
         self.S = self.sim_arr
 
     def loop_userzzzzzz(self):
+        users = self.Y_data[:, 0]
         self.sim_arr = np.zeros((self.n_users, self.n_users))
-        # print(self.n_users)
         for i in range(self.n_users):
-            # ids = np.where(users == i)[0].astype(np.int32)
-            #ratings_i_nD = self.Ybar.T[i, :].toarray()
+            ids = np.where(users == i)[0].astype(np.int32)
+            item_ids = self.Y_data[ids, 1].astype(np.int32)
+            #print("item_ids", item_ids)
             ratings_i = self.Ybar[i, :]
-            # Xuất ra mảng nhiều chiều [[value]], cần truyền mảng 1 chiều [value] => :
-            #ratings_i = ratings_i_nD[0]
-            print('u{}={}'.format(i, ratings_i))
+            #print("ratings_i", ratings_i)
+            print('u{}'.format(i))
             for j in range(self.n_users):
-                # jds = np.where(users == j)[0].astype(np.int32)
-                #ratings_j_nD = self.Ybar.T[j, :].toarray()
-                # Xuất ra mảng nhiều chiều [[value]], cần truyền mảng 1 chiều [value] => :
-                #ratings_j = ratings_j_nD[0]
-
+                #jds = np.where(users == j)[0].astype(np.int32)
+                #item_jds = self.Y_data[jds, 1].astype(np.int32)
                 ratings_j = self.Ybar[j, :]
-                #print('v{}={}'.format(j, ratings_j))
-                # print("-----")
+                #print("ratings_j", ratings_j)
                 self.sim_arr[i, j] = self.dist_func(
-                    ratings_i, ratings_j)
-            self.sim_arr[i]
-        self.S = self.sim_arr
+                    item_ids, ratings_i, ratings_j)
+            self.S = self.sim_arr
     # tính độ tương đồng
 
     def similarity(self, method=1):
         if method == 1:  # cosine
             # T là ma trận nghịch đảo, ở đây nghịch đảo vị trí user-item thành vị trí item-user
-            self.S = self.dist_func(self.Ybar, self.Ybar)  # dùng thư viện
+            self.S = self.dist_func(self.Ybar.T, self.Ybar.T)  # dùng thư viện
             # self.loop_user()
             # jaccard np.where(a > 0.5, 1, 0) ý tưởng là dùng hàm trên id của item non zero
         if method == 2:
@@ -325,7 +342,7 @@ class CF(object):
             for i in range(self.n_users):
                 ids = np.where(users == i)[0].astype(np.int32)
                 item_ids = self.Y_data[ids, 1]
-                #print('u{}={}'.format(i, item_ids))
+                # print('u{}={}'.format(i, item_ids))
                 print('u{}'.format(i))
                 # self.sim_jaccard[ids, ids] = 1
                 for j in range(self.n_users):
@@ -340,7 +357,7 @@ class CF(object):
         if method == 3:  # msd_similarity
             self.loop_user()
         if method == 4:  # COR
-            self.loop_user()
+            self.loop_userzzzzzz()
         if method == 5:  # CPC
             self.loop_user()
         print('S nè :')
@@ -361,7 +378,7 @@ class CF(object):
     # Predict và recommend
 
     def __pred(self, u, i, normalized=1):
-        """ 
+        """
         predict the rating of user u for item i (normalized)
         if you need the un
         """
@@ -370,6 +387,8 @@ class CF(object):
         ids = np.where(self.Y_data[:, 1] == i)[0].astype(np.int32)
         # Step 2:
         users_rated_i = (self.Y_data[ids, 0]).astype(np.int32)
+        print("users_rated_i", users_rated_i)
+        rating_users_i = (self.Y_data[ids, 2]).astype(np.int32)
         # Step 3: find similarity btw the current user and others
         # who already rated i
         sim = self.S[u, users_rated_i]
@@ -378,16 +397,27 @@ class CF(object):
         # and the corresponding similarity levels
         nearest_s = sim[a]
         # How did each of 'near' users rated item i
-        r = self.Ybar[i, users_rated_i[a]]
+        #r = self.Ybar[i, a] - self.mu[a]
+        print("mang y", self.Y[16, 108])
+        print("mu[4] nè: ", self.mu[108])
+        print("mang ybar", self.Ybar[16, 108])
+        r = self.Y[i, users_rated_i[a]].toarray()
+        #r = users_rated_i[a]-self.mu[users_rated_i[a]]
+        print(" ng a nè", users_rated_i[a])
+        print("sản phẩm nè", i)
+        print("u nè", u)
+        print("a nè:", a)
+        print("rating của ng a nè", rating_users_i[a])
+        print("mu[a] nè: ", self.mu[users_rated_i[a]])
+        print("r nè:", r)
+        print("nearest_s nè:", nearest_s)
         if normalized:
             # add a small number, for instance, 1e-8, to avoid dividing by 0
-            return (r*nearest_s)[0]/(np.abs(nearest_s).sum() + 1e-8)
-
-        # + self.mu[u]
+            return (rr*nearest_s)[0]/(np.abs(nearest_s).sum() + 1e-8) + self.mu[u]
         return (r*nearest_s)[0]/(np.abs(nearest_s).sum() + 1e-8)
 
     def pred(self, u, i, normalized=1):
-        """ 
+        """
         predict the rating of user u for item i (normalized)
         if you need the un
         """
@@ -399,8 +429,8 @@ class CF(object):
         """
         Determine all items should be recommended for user u.
         The decision is made based on all i such that:
-        self.pred(u, i) > 0. Suppose we are considering items which 
-        have not been rated by u yet. 
+        self.pred(u, i) > 0. Suppose we are considering items which
+        have not been rated by u yet.
         """
         ids = np.where(self.Y_data[:, 0] == u)[0]
         items_rated_by_u = self.Y_data[ids, 1].tolist()
@@ -417,8 +447,8 @@ class CF(object):
         """
         Determine all items should be recommended for user u.
         The decision is made based on all i such that:
-        self.pred(u, i) > 0. Suppose we are considering items which 
-        have not been rated by u yet. 
+        self.pred(u, i) > 0. Suppose we are considering items which
+        have not been rated by u yet.
         """
         ids = np.where(self.Y_data[:, 0] == u)[0]
         items_rated_by_u = self.Y_data[ids, 1].tolist()
@@ -434,7 +464,7 @@ class CF(object):
 
     def print_recommendation(self):
         """
-        print all items which should be recommended for each user 
+        print all items which should be recommended for each user
         """
         print('Recommendation: ')
         for u in range(self.n_users):
