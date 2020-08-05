@@ -31,7 +31,15 @@ n_tests = rate_test.shape[0]
 SE = 0  # squared error
 for n in range(n_tests):
     pred = rs.pred(rate_test[n, 0], rate_test[n, 1], normalized=1)
-    SE += (pred - rate_test[n, 2])**2
+    print("pred", pred)
+    print("rate_test[{}, 2]={}".format(n, rate_test[n, 2]))
+    SE += (pred - rate_test[n, 2]) ** 2
 
 RMSE = np.sqrt(SE/n_tests)
 print('User-user CF, RMSE =', RMSE)
+
+'''print("rate_train test: ", rate_train)
+print("rate_train.shape", rate_train.shape)
+print("rate test: ", rate_test)
+print("rate_test.shape", rate_test.shape)
+'''

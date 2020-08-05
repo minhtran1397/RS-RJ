@@ -218,7 +218,7 @@ class CF(object):
             self.mu[n] = m
             # normalize: FIXME: chuẩn hóa rating sang rating trừ trung bình ?!!!
             self.Ybar_data[ids, 2] = ratings  # - self.mu[n]
-            #print("mu nè: ", self.mu[n])
+            # print("mu nè: ", self.mu[n])
         ################################################
         # sparse matrix là ma trận hiểu số 0 là rỗng, chỉ lưu trữ vị trí của nó
         # form the rating matrix as a sparse matrix. Sparsity is important
@@ -233,7 +233,7 @@ class CF(object):
         '''self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
                                        (self.Ybar_data[:, 0], self.Ybar_data[:, 1])), (self.n_users, self.n_items))'''
         self.Ybar = self.Ybar.tocsr()  # sắp xếp lại theo thứ tự tăng dần id item
-        #self.Ybar = self.Ybar.toarray()
+        # self.Ybar = self.Ybar.toarray()
         print('users-items')
         print(self.Ybar)
 
@@ -252,14 +252,13 @@ class CF(object):
             ratings = self.Y_data[ids, 2]
             # tính trung bình đánh giá matrix
             m = np.mean(ratings)
-            #print("m nè: ", m)
+            # print("m nè: ", m)
             if np.isnan(m):  # Nếu giá trị m rỗng hoặc không phải số thì m=0
                 m = 0  # to avoid empty array and nan value
             self.mu[n] = m
             # normalize: FIXME: chuẩn hóa rating sang rating trừ trung bình ?!!!
-            #print("ratings - self.mu[n]", ratings - self.mu[n])
+            # print("ratings - self.mu[n]", ratings - self.mu[n])
             self.Ybar_data[ids, 2] = ratings-self.mu[n]
-            print("Ybar_data[ids, 2] ", self.Ybar_data[ids, 2])
 
         ################################################
         # sparse matrix là ma trận hiểu số 0 là rỗng, chỉ lưu trữ vị trí của nó
@@ -315,15 +314,15 @@ class CF(object):
         for i in range(self.n_users):
             ids = np.where(users == i)[0].astype(np.int32)
             item_ids = self.Y_data[ids, 1].astype(np.int32)
-            #print("item_ids", item_ids)
+            # print("item_ids", item_ids)
             ratings_i = self.Ybar[i, :]
-            #print("ratings_i", ratings_i)
+            # print("ratings_i", ratings_i)
             print('u{}'.format(i))
             for j in range(self.n_users):
-                #jds = np.where(users == j)[0].astype(np.int32)
-                #item_jds = self.Y_data[jds, 1].astype(np.int32)
+                # jds = np.where(users == j)[0].astype(np.int32)
+                # item_jds = self.Y_data[jds, 1].astype(np.int32)
                 ratings_j = self.Ybar[j, :]
-                #print("ratings_j", ratings_j)
+                # print("ratings_j", ratings_j)
                 self.sim_arr[i, j] = self.dist_func(
                     item_ids, ratings_i, ratings_j)
             self.S = self.sim_arr
@@ -387,7 +386,6 @@ class CF(object):
         ids = np.where(self.Y_data[:, 1] == i)[0].astype(np.int32)
         # Step 2:
         users_rated_i = (self.Y_data[ids, 0]).astype(np.int32)
-        print("users_rated_i", users_rated_i)
         rating_users_i = (self.Y_data[ids, 2]).astype(np.int32)
         # Step 3: find similarity btw the current user and others
         # who already rated i
@@ -397,12 +395,13 @@ class CF(object):
         # and the corresponding similarity levels
         nearest_s = sim[a]
         # How did each of 'near' users rated item i
-        #r = self.Ybar[i, a] - self.mu[a]
+        # r = self.Y[i, users_rated_i[a]].toarray()
+        r = rating_users_i[a]-self.mu[users_rated_i[a]]
+        '''print("tuong dong", self.S[0, 108])
+        print("users_rated_i", users_rated_i)
         print("mang y", self.Y[16, 108])
         print("mu[4] nè: ", self.mu[108])
         print("mang ybar", self.Ybar[16, 108])
-        r = self.Y[i, users_rated_i[a]].toarray()
-        #r = users_rated_i[a]-self.mu[users_rated_i[a]]
         print(" ng a nè", users_rated_i[a])
         print("sản phẩm nè", i)
         print("u nè", u)
@@ -410,11 +409,12 @@ class CF(object):
         print("rating của ng a nè", rating_users_i[a])
         print("mu[a] nè: ", self.mu[users_rated_i[a]])
         print("r nè:", r)
-        print("nearest_s nè:", nearest_s)
+        print("nearest_s nè:", nearest_s) '''
+
         if normalized:
             # add a small number, for instance, 1e-8, to avoid dividing by 0
-            return (rr*nearest_s)[0]/(np.abs(nearest_s).sum() + 1e-8) + self.mu[u]
-        return (r*nearest_s)[0]/(np.abs(nearest_s).sum() + 1e-8)
+            return (r*nearest_s).sum()/(np.abs(nearest_s).sum() + 1e-8) + self.mu[u]
+        return (r*nearest_s)[0]/(np.abs(nearest_s).sum() + 1e-8) + self.mu[u]
 
     def pred(self, u, i, normalized=1):
         """
