@@ -23,6 +23,17 @@ These metrics do not support sparse matrix inputs.
 # from scipy.spatial import distance
 
 
+def urp_similarity(u, v):
+    avg_u = np.mean(u.data)
+    avg_v = np.mean(v.data)
+    var_u = sqrt(sum([(i - avg_u) ** 2 for i in u.data]) / len(u.data))
+    var_v = sqrt(sum([(j - avg_v) ** 2 for j in v.data]) / len(v.data))
+    print("u data", u.data)
+    print("avg_u", avg_u)
+    print("var_u", var_u)
+    return (1-(1/(1+exp(-abs(avg_u-avg_v)*(abs(var_u-var_v))))))
+
+
 def jaccard_similarity(x, y):
     """ returns the jaccard similarity between two lists """
     intersection_cardinality = len(set.intersection(*[set(x), set(y)]))
@@ -57,30 +68,63 @@ def common_dimensions(u, v):
     return common_u, common_v
 
 
-def common_dimensions1(item_ids, u, v):
+def common_dimensions1(common, u, v):
     '''takes in two vectors and returns a tuple of the vectors with both non zero dimensions
         i.e.
         v1 : [ 1, 2, 3, 0 ]        -->      return [2, 3]
         v2 : [ 0, 4, 5, 6 ]        -->      return [4, 5] '''
-    common_u = []
-    common_v = []
-    for i in range(len(item_ids)):
-        if v[item_ids[i]] != 0:
-            common_u.append(u[item_ids[i]])
-            common_v.append(v[item_ids[i]])
-            # print 'INDEX SAME:',i
-    return common_u, common_v
+    common_u = u[:, common].toarray()
+    common_v = v[:, common].toarray()
+    # common = np.intersect1d(item_ids, item_jds)
+    # common_u = []
+    # common_v = []
+    # print("common", common)
+    # for i in range(len(item_ids)):
+    # print("v[:, common].data", v[:, common].data)
+    # print("u[:, common].data", u[:, common].data)
+    # for i in range(len(common)):
+    # for i in range(item_ids.shape[]):
+    # print("v[item_ids[i]]", v[:, item_ids[i]].data[0])
+    # if v[item_ids[i]] != 0:
+    # if v[:, item_ids[i]].data
+    # common_v = np.append(common_v, v[:, common].data, axis=0)
+    # common_u = np.append(common_u, u[:, common].data, axis=0)
+    # print("common_u", common_u)
+    # common_v.append(v[:, item_ids[i]].data[0])
+    # common_u.append(u[:, item_ids[i]].data[0])
+    # print 'INDEX SAME:',i
+    # print("common_u", common_u)
+    # print("common_v", common_v)
+    return common_u[0], common_v[0]
 
 
-def msd_similarity(u, v):
-    l = 25
-    common_arr = common_dimensions(u, v)
-    msd = sum(pow(a - b, 2) for a, b in zip(common_arr[0], common_arr[1]))
-    intersection_cardinality = len(common_arr[0])
+def msd_similarity(common, u, v):
+    l = 16
+    # common_arr = common_dimensions1(item_ids, u, v)
+    common_u = u[:, common].toarray()[0]
+    common_v = v[:, common].toarray()[0]
+    msd = sum(pow(a - b, 2) for a, b in zip(common_u, common_v))
+    intersection_cardinality = len(common_u)
     if intersection_cardinality == 0:
         return 0
     else:
         return (1-((msd/intersection_cardinality)/l))
+
+
+def msd_similarity_pp(common, u, v):
+    # common_arr = common_dimensions1(item_ids, u, v)
+    common_u = u[:, common].toarray()[0]
+    common_v = v[:, common].toarray()[0]
+    # Chuyển giá trị đánh giá sang thang điểm [0,1]
+    # [1,2,3,4,5] -> [0,0.25,0.5,0.75,1]
+    common_u = np.where(common_u, (1/4)*(common_u-1), common_u)
+    common_v = np.where(common_v, (1/4)*(common_v-1), common_v)
+    msd = sum(pow(a - b, 2) for a, b in zip(common_u, common_v))
+    intersection_cardinality = len(common_u)
+    if intersection_cardinality == 0:
+        return 0
+    else:
+        return (1-(msd/intersection_cardinality))
 
 
 def square_rooted(x, y=0):
@@ -89,11 +133,21 @@ def square_rooted(x, y=0):
     return sqrt(sum([(a - y) * (a - y) for a in x]))
 
 
-def cos_similarity(item_ids, u, v):
-    common_arr = common_dimensions1(item_ids, u, v)
-    common_u = common_arr[0]
-    common_v = common_arr[1]
-    numerator = sum(a * b for a, b in zip(common_u, common_v))
+def rjmsd_similarity(common, ids, jds, u, v):
+    rj = rjaccard_similarity(ids, jds)
+    msd = msd_similarity(common, u, v)
+    return rj*msd
+
+
+def cos_similarity(common, u, v):
+    # common_arr = common_dimensions1(common, u, v)
+    # print("common_arr", common_arr)
+    '''common_u = common_arr[0]
+    common_v = common_arr[1] '''
+    common_u = u[:, common].toarray()[0]
+    common_v = v[:, common].toarray()[0]
+    # numerator = sum(a * b for a, b in zip(common_u, common_v))
+    numerator = (common_u * common_v).sum()
     denominator = square_rooted(
         common_u)*square_rooted(common_v)
     if denominator == 0:
@@ -123,22 +177,24 @@ def nonzero_count(my_list):
     return counter
 
 
-def cor_similarity(u, v):
+def cor_similarity(common, u, v):
     # rm: lấy average(common):
-    common_arr = common_dimensions(u, v)
+    '''common_arr = common_dimensions1(common, u, v)
     common_u = common_arr[0]
-    common_v = common_arr[1]
-    avg_u = sum(u) / nonzero_count(u)
+    common_v = common_arr[1] '''
+    avg_u = np.mean(u.data)
+    avg_v = np.mean(v.data)
+    common_u = u[:, common].toarray()[0]-avg_u
+    common_v = v[:, common].toarray()[0] - avg_v
+    # avg_u = sum(u) / nonzero_count(u)
     # print("sum(u): ", sum(u))
     # print("sum(v): ", sum(v))
-
-    avg_v = sum(v) / nonzero_count(v)
+    # avg_v = sum(v) / nonzero_count(v)
     # print("avg_u: ", avg_u)
     # print("avg_v: ", avg_v)
-    numerator = sum((a - avg_u)*(b - avg_v)
-                    for a, b in zip(common_u, common_v))
-    denominator = square_rooted(
-        common_u, avg_u)*square_rooted(common_v, avg_v)
+    # numerator = sum((a - avg_u)*(b - avg_v)for a, b in zip(common_u, common_v))
+    numerator = (common_u * common_v).sum()
+    denominator = square_rooted(common_u)*square_rooted(common_v)
     if denominator == 0:
         return 0
     else:
@@ -146,12 +202,41 @@ def cor_similarity(u, v):
         return numerator / float(denominator)
 
 
-def cpc_similarity(u, v):
+def WPC_similarity(common, numofratingperitem, u, v):
+    # rm: lấy average(common):
+    '''common_arr = common_dimensions1(common, u, v)
+    common_u = common_arr[0]
+    common_v = common_arr[1] '''
+    avg_u = np.mean(u.data)
+    avg_v = np.mean(v.data)
+    common_u = u[:, common].toarray()[0]-avg_u
+    common_v = v[:, common].toarray()[0] - avg_v
+    mj = numofratingperitem[common]
+    W = np.log(mj/924)
+    # avg_u = sum(u) / nonzero_count(u)
+    # print("sum(u): ", sum(u))
+    # print("sum(v): ", sum(v))
+    # avg_v = sum(v) / nonzero_count(v)
+    # print("avg_u: ", avg_u)
+    # print("avg_v: ", avg_v)
+    # numerator = sum((a - avg_u)*(b - avg_v)for a, b in zip(common_u, common_v))
+    numerator = (common_u * common_v).sum()
+    denominator = square_rooted(common_u)*square_rooted(common_v)
+    if denominator == 0:
+        return 0
+    else:
+        # return round(numerator / float(denominator), 3)
+        return numerator / float(denominator)
+
+
+def cpc_similarity(common, u, v):
     # rm: lấy average(common):
     rm = 2.5
-    common_arr = common_dimensions(u, v)
+    '''common_arr = common_dimensions1(common, u, v)
     common_u = common_arr[0]
-    common_v = common_arr[1]
+    common_v = common_arr[1] '''
+    common_u = u[:, common].toarray()[0]
+    common_v = v[:, common].toarray()[0]
     numerator = sum((a - rm)*(b - rm)
                     for a, b in zip(common_u, common_v))
     denominator = square_rooted(
@@ -227,11 +312,10 @@ class CF(object):
         # you may not have enough memory to store this. Then, instead, we store
         # nonzeros only, and, of course, their locations.
         # Tạo mảng ((item, user) rating)
-        self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
-                                       (self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))
+        # self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],(self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))'''
         # Tạo mảng ((item, user) rating)
-        '''self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
-                                       (self.Ybar_data[:, 0], self.Ybar_data[:, 1])), (self.n_users, self.n_items))'''
+        self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
+                                       (self.Ybar_data[:, 0], self.Ybar_data[:, 1])), (self.n_users, self.n_items))
         self.Ybar = self.Ybar.tocsr()  # sắp xếp lại theo thứ tự tăng dần id item
         # self.Ybar = self.Ybar.toarray()
         print('users-items')
@@ -267,9 +351,15 @@ class CF(object):
         # #item = 100k, then shape of the rating matrix would be (100k, 1M),
         # you may not have enough memory to store this. Then, instead, we store
         # nonzeros only, and, of course, their locations.
+        self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
+                                       (self.Ybar_data[:, 0], self.Ybar_data[:, 1])), (self.n_users, self.n_items))
+        # self.Ybar = self.Ybar.tocsr()  # sắp xếp lại theo thứ tự tăng dần id item
+        self.Ybar = self.Ybar.toarray()
+        print('users-items')
+        print(self.Ybar)
         '''# Tạo mảng ((item, user) rating)
         self.Ybar = sparse.coo_matrix((self.Ybar_data[:, 2],
-                                       (self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))'''
+                                       (self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))
         # Tạo mảng ((item, user) rating)
         self.Y = sparse.coo_matrix((self.Ybar_data[:, 2],
                                     (self.Ybar_data[:, 1], self.Ybar_data[:, 0])), (self.n_items, self.n_users))
@@ -280,7 +370,7 @@ class CF(object):
                                        (self.Y_data[:, 1], self.Y_data[:, 0])), (self.n_items, self.n_users))
         self.Ybar = self.Ybar.tocsr()  # sắp xếp lại theo thứ tự tăng dần id item
         print('Ybar.T')
-        print(self.Ybar.T)
+        print(self.Ybar.T)'''
     # Chuyển ma trận thành 0 1 (binary) để tính Jaccard
 
     """def intArrToBinary(self):
@@ -313,25 +403,48 @@ class CF(object):
         self.sim_arr = np.zeros((self.n_users, self.n_users))
         for i in range(self.n_users):
             ids = np.where(users == i)[0].astype(np.int32)
+            # item_ids = self.Y_data[ids, 1].astype(np.int32)
+            # item_ids = np.array([])
             item_ids = self.Y_data[ids, 1].astype(np.int32)
             # print("item_ids", item_ids)
             ratings_i = self.Ybar[i, :]
             # print("ratings_i", ratings_i)
             print('u{}'.format(i))
             for j in range(self.n_users):
-                # jds = np.where(users == j)[0].astype(np.int32)
-                # item_jds = self.Y_data[jds, 1].astype(np.int32)
+                jds = np.where(users == j)[0].astype(np.int32)
+                item_jds = self.Y_data[jds, 1].astype(np.int32)
+                common = np.intersect1d(item_ids, item_jds)
+                # bắt thưa
                 ratings_j = self.Ybar[j, :]
-                # print("ratings_j", ratings_j)
-                self.sim_arr[i, j] = self.dist_func(
-                    item_ids, ratings_i, ratings_j)
-            self.S = self.sim_arr
+                self.sim_arr[i, j] = self.dist_func(common,
+                                                    ratings_i, ratings_j)
+        self.S = self.sim_arr
+
+    def loop_usernnn(self):
+        users = self.Y_data[:, 0]
+        self.sim_arr = np.zeros((self.n_users, self.n_users))
+        for i in range(self.n_users):
+            ids = np.where(users == i)[0].astype(np.int32)
+            # item_ids = self.Y_data[ids, 1].astype(np.int32)
+            # item_ids = np.array([])
+            item_ids = self.Y_data[ids, 1].astype(np.int32)
+            # print("item_ids", item_ids)
+            ratings_i = self.Ybar[i, :]
+            # print("ratings_i", ratings_i)
+            print('u{}'.format(i))
+            for j in range(self.n_users):
+                jds = np.where(users == j)[0].astype(np.int32)
+                item_jds = self.Y_data[jds, 1].astype(np.int32)
+                # bắt thưa
+                ratings_j = self.Ybar[j, :]
+                self.sim_arr[i, j] = self.dist_func(ratings_i, ratings_j)
+        self.S = self.sim_arr
     # tính độ tương đồng
 
     def similarity(self, method=1):
         if method == 1:  # cosine
             # T là ma trận nghịch đảo, ở đây nghịch đảo vị trí user-item thành vị trí item-user
-            self.S = self.dist_func(self.Ybar.T, self.Ybar.T)  # dùng thư viện
+            self.S = self.dist_func(self.Ybar, self.Ybar)  # dùng thư viện
             # self.loop_user()
             # jaccard np.where(a > 0.5, 1, 0) ý tưởng là dùng hàm trên id của item non zero
         if method == 2:
@@ -351,16 +464,55 @@ class CF(object):
                     # print("-----")
                     self.sim_jaccard[i, j] = self.dist_func(
                         item_ids, item_jds)
-                self.sim_jaccard[i]
             self.S = self.sim_jaccard
-        if method == 3:  # msd_similarity
-            self.loop_user()
+        if method == 3:  # urp
+            self.loop_usernnn()
         if method == 4:  # COR
             self.loop_userzzzzzz()
         if method == 5:  # CPC
-            self.loop_user()
-        print('S nè :')
-        print(self.S)
+            users = self.Y_data[:, 0]
+            self.sim_arr = np.zeros((self.n_users, self.n_users))
+            for i in range(self.n_users):
+                ids = np.where(users == i)[0].astype(np.int32)
+            # item_ids = self.Y_data[ids, 1].astype(np.int32)
+            # item_ids = np.array([])
+                item_ids = self.Y_data[ids, 1].astype(np.int32)
+            # print("item_ids", item_ids)
+                ratings_i = self.Ybar[i, :]
+            # print("ratings_i", ratings_i)
+                print('u{}'.format(i))
+                for j in range(self.n_users):
+                    jds = np.where(users == j)[0].astype(np.int32)
+                    item_jds = self.Y_data[jds, 1].astype(np.int32)
+                    common = np.intersect1d(item_ids, item_jds)
+                # bắt thưa
+                    ratings_j = self.Ybar[j, :]
+                    self.sim_arr[i, j] = self.dist_func(
+                        common, item_ids, item_jds, ratings_i, ratings_j)
+                self.S = self.sim_arr
+        if method == 6:  # WPC
+            users = self.Y_data[:, 0]
+            self.sim_arr = np.zeros((self.n_users, self.n_users))
+            numofratingperitem = Ybar.getnzz(axis=0)
+            for i in range(self.n_users):
+                ids = np.where(users == i)[0].astype(np.int32)
+            # item_ids = self.Y_data[ids, 1].astype(np.int32)
+            # item_ids = np.array([])
+                item_ids = self.Y_data[ids, 1].astype(np.int32)
+            # print("item_ids", item_ids)
+                ratings_i = self.Ybar[i, :]
+            # print("ratings_i", ratings_i)
+                print('u{}'.format(i))
+                for j in range(self.n_users):
+                    jds = np.where(users == j)[0].astype(np.int32)
+                    item_jds = self.Y_data[jds, 1].astype(np.int32)
+                    common = np.intersect1d(item_ids, item_jds)
+                # bắt thưa
+                    ratings_j = self.Ybar[j, :]
+                    self.sim_arr[i, j] = self.dist_func(
+                        common, numofratingperitem, ratings_i, ratings_j)
+                self.S = self.sim_arr
+        print("sim user_user:", self.S)
 
     # Thực hiện lại 2 hàm phía trên khi có thêm dữ liệu:
     def refresh(self, method=1):
@@ -368,13 +520,37 @@ class CF(object):
         Normalize data and calculate similarity matrix again (after
         some few ratings added)
         """
-        self.normalize_Y()
+        self.normalize_Yzzzzzzz()
         self.similarity(method)
 
     def fit(self, method=1):
         self.refresh(method)
 
     # Predict và recommend
+
+    def __pred1(self, u, i, nearest_s, normalized=1):
+        sim = self.S[u, :]
+        a = np.argsort(sim)[-self.k:]
+        nearest_s = sim[a]
+        ids = np.where(self.Y_data[:, 1] == i)[0].astype(np.int32)
+        users_rated_i = (self.Y_data[ids, 0]).astype(np.int32)
+        #rating_users_i = (self.Y_data[ids, 2]).astype(np.int32)
+        #print("a", a)
+        #print("users_rated_i", users_rated_i)
+        r = np.array([])
+        for j in range(a.size):
+            if a[j] not in users_rated_i:
+                p = 0 - self.mu[a[j]]
+                r = np.append(r, [p], axis=0)
+            else:
+                p = self.Ybar[a[j], i].data - self.mu[a[j]]
+                r = np.append(r, [p], axis=0)
+        #print("r", r)
+        #print("(nearest_s)", nearest_s)
+        '''print("pred:", (r*nearest_s).sum() /
+              (np.abs(nearest_s).sum() + 1e-8) + self.mu[u])'''
+        # add a small number, for instance, 1e-8, to avoid dividing by 0
+        return (r*nearest_s).sum()/(np.abs(nearest_s).sum() + 1e-8) + self.mu[u]
 
     def __pred(self, u, i, normalized=1):
         """
@@ -410,11 +586,12 @@ class CF(object):
         print("mu[a] nè: ", self.mu[users_rated_i[a]])
         print("r nè:", r)
         print("nearest_s nè:", nearest_s) '''
-
-        if normalized:
-            # add a small number, for instance, 1e-8, to avoid dividing by 0
-            return (r*nearest_s).sum()/(np.abs(nearest_s).sum() + 1e-8) + self.mu[u]
-        return (r*nearest_s)[0]/(np.abs(nearest_s).sum() + 1e-8) + self.mu[u]
+        #print("r", r)
+        #print("(nearest_s)", nearest_s)
+        '''print("pred:", (r*nearest_s).sum() /
+              (np.abs(nearest_s).sum() + 1e-8) + self.mu[u])'''
+        # add a small number, for instance, 1e-8, to avoid dividing by 0
+        return (r*nearest_s).sum()/(np.abs(nearest_s).sum() + 1e-8) + self.mu[u]
 
     def pred(self, u, i, normalized=1):
         """
@@ -435,11 +612,16 @@ class CF(object):
         ids = np.where(self.Y_data[:, 0] == u)[0]
         items_rated_by_u = self.Y_data[ids, 1].tolist()
         recommended_items = []
+        sim = self.S[u, :]
+        a = np.argsort(sim)[-self.k:]
+        nearest_s = sim[a]
         for i in range(self.n_items):
-            if i not in items_rated_by_u:
+            if i not in items_rated_by_u and nearest_s.size > 0:
                 rating = self.__pred(u, i)
                 if rating > 0:
                     recommended_items.append(i)
+            else:
+                return 0
 
         return recommended_items
 
